@@ -1,0 +1,3 @@
+[submodule "lib/SocketHandler"]
+	path = lib/SocketHandler
+	url = https://github.com/d00mlord/SocketHandler.git
