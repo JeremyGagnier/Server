@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "Server\Server.csproj", "{163F838B-9C1B-42D4-B91F-901C3149E74D}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A1E81C5B-5A02-49D1-9980-B4C9C2038306} = {A1E81C5B-5A02-49D1-9980-B4C9C2038306}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocketHandler", "lib\SocketHandler\SocketHandler\SocketHandler.csproj", "{A1E81C5B-5A02-49D1-9980-B4C9C2038306}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{3ACFBB60-5290-4070-81D6-397A3A82ACCC}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{163F838B-9C1B-42D4-B91F-901C3149E74D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{163F838B-9C1B-42D4-B91F-901C3149E74D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{163F838B-9C1B-42D4-B91F-901C3149E74D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{163F838B-9C1B-42D4-B91F-901C3149E74D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1E81C5B-5A02-49D1-9980-B4C9C2038306}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1E81C5B-5A02-49D1-9980-B4C9C2038306}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1E81C5B-5A02-49D1-9980-B4C9C2038306}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1E81C5B-5A02-49D1-9980-B4C9C2038306}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
