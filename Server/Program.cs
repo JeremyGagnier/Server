@@ -11,6 +11,8 @@ namespace PGLoginServer
     class Program
     {
 
+        static int usersOnline = 0;
+
         /// <summary>
         /// 
         /// </summary>
@@ -19,6 +21,36 @@ namespace PGLoginServer
         {
             SocketHandler.Server servSocket = new SocketHandler.Server(1134);
             servSocket.onNewConnection += StartNewSession;
+
+            bool running = true;
+            servSocket.onCloseConnection += (e) =>
+            {
+                if (e != null)
+                {
+                    Console.WriteLine("Server crashed:");
+                    Console.WriteLine(e);
+                    running = false;
+                }
+            };
+
+            string message;
+            while (running)
+            {
+                message = Console.ReadLine();
+                if (message == "q")
+                {
+                    running = false;
+                    servSocket.IsRunning = false;
+                }
+                else if (message == "h")
+                {
+                    Console.Write("h - help\nq - quit (shutdown server)\nlive - how many users are online right now\n");
+                }
+                else if (message == "live")
+                {
+                    Console.WriteLine(usersOnline);
+                }
+            }
         }
 
         /// <summary>
@@ -37,9 +69,14 @@ namespace PGLoginServer
         /// <param name="username"></param>
         public static void Login(Socket socket, char game, string username)
         {
+            usersOnline += 1;
             if (game == Messenger.GAME_TOKEN)
             {
-                new Messenger(socket, username);
+                Messenger tmp = new Messenger(socket, username);
+                tmp.onCloseConnection += (e) =>
+                {
+                    usersOnline -= 1;
+                };
             }
         }
     }

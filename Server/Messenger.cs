@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Net;
 using System.Net.Sockets;
@@ -11,6 +12,8 @@ namespace PGLoginServer
 {
     class Messenger
     {
+        public const bool DEBUG = true;
+
         public const char GAME_TOKEN = 'm';
 
         private const char GLOBAL_TOKEN = 'g';
@@ -20,9 +23,10 @@ namespace PGLoginServer
         private Socket sock = null;
         private string user = null;
         private Dictionary<string, object> userData = null;
+        public Action<Exception> onCloseConnection = null;
 
         public static Action<string> onGlobalMessage = null;
-        public static Dictionary<string, Action<string>> users = new Dictionary<string,Action<string>>();
+        public static Dictionary<string, Action<string>> users = new Dictionary<string, Action<string>>();
 
         /// <summary>
         /// Basic messenger program for sending messages to other connected clients.
@@ -39,11 +43,20 @@ namespace PGLoginServer
             onGlobalMessage += SendMessage;
             users[username] = SendMessage;
 
-            using (System.IO.FileStream fIn = System.IO.File.OpenRead(GAME_TOKEN + "/" + username))
+            try
             {
-                byte[] readData = new byte[fIn.Length];
-                fIn.Read(readData, 0, (int)fIn.Length);
-                userData = (Dictionary<string, object>)JsonConvert.DeserializeObject(Encoding.Unicode.GetString(readData));
+                using (System.IO.FileStream fIn = System.IO.File.OpenRead(GAME_TOKEN + "/" + username))
+                {
+                    byte[] readData = new byte[fIn.Length];
+                    fIn.Read(readData, 0, (int)fIn.Length);
+                    userData = (Dictionary<string, object>)JsonConvert.DeserializeObject(Encoding.Unicode.GetString(readData));
+                }
+            }
+            catch (System.IO.FileNotFoundException)
+            {
+                using (System.IO.FileStream fIn = System.IO.File.OpenWrite(GAME_TOKEN + "/" + username))
+                {
+                }
             }
         }
 
@@ -53,14 +66,24 @@ namespace PGLoginServer
         /// <param name="message">The message recieved from the connected client.</param>
         private void ParseMessage(string message)
         {
-            // First character represents the type of message.
-            if (message[0] == GLOBAL_TOKEN)
+
+            string messageRegex = "[" + GLOBAL_TOKEN + PRIVATE_TOKEN + "]" + ".*";
+
+            string match = Regex.Match(message, messageRegex).Value;
+            if (string.IsNullOrEmpty(match))
             {
-                ParseGlobal(message.Substring(1));
+                Debug("Improperly formatted message:\n" + message);
+                return;
             }
-            else if (message[0] == PRIVATE_TOKEN)
+
+            // First character represents the type of message.
+            if (match[0] == GLOBAL_TOKEN)
             {
-                ParsePrivate(message.Substring(1));
+                ParseGlobal(match.Substring(1));
+            }
+            else if (match[0] == PRIVATE_TOKEN)
+            {
+                ParsePrivate(match.Substring(1));
             }
         }
 
@@ -108,9 +131,12 @@ namespace PGLoginServer
             
             // Prevent sending yourself the message.
             // However sometimes it might be useful to receive your own message back.
-            onGlobalMessage -= SendMessage;
-            onGlobalMessage(message);
-            onGlobalMessage += SendMessage;
+            //onGlobalMessage -= SendMessage;
+            if (onGlobalMessage != null)
+            {
+                onGlobalMessage(message);
+            }
+            //onGlobalMessage += SendMessage;
         }
 
         /// <summary>
@@ -132,8 +158,28 @@ namespace PGLoginServer
             controller = null;
             onGlobalMessage -= SendMessage;
             users.Remove(user);
-            sock.Shutdown(SocketShutdown.Both);
-            sock.Close();
+
+            try
+            {
+                sock.Shutdown(SocketShutdown.Both);
+                sock.Close();
+            }
+            catch (Exception)
+            {
+            }
+
+            if (onCloseConnection != null)
+            {
+                onCloseConnection(e);
+            }
+        }
+
+        private void Debug(string s)
+        {
+            if (DEBUG)
+            {
+                Console.WriteLine("MESSENGER: " + s);
+            }
         }
     }
 }

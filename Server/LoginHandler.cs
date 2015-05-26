@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Net;
@@ -12,6 +13,8 @@ namespace PGLoginServer
 {
     class LoginHandler
     {
+        public const bool DEBUG = true;
+
         const char LOGIN_TOKEN = 'l';
         const char REGISTER_TOKEN = 'r';
 
@@ -43,32 +46,43 @@ namespace PGLoginServer
             // - Second character is game token
             // - From then up to the first comma is the username
             // - From then up to the end is the password
-            bool register = (message[0] == REGISTER_TOKEN);
-            char game = message[1];
+            string loginRegex = "[" + LOGIN_TOKEN + REGISTER_TOKEN + "]" + 
+                                "[" + Messenger.GAME_TOKEN + "]" + 
+                                ".{4,16},.{4,16}$";
+
+            string match = Regex.Match(message, loginRegex).Value;
+            if (string.IsNullOrEmpty(match))
+            {
+                Debug("Improperly formatted login message:\n" + message);
+                return;
+            }
+
+            bool register = (match[0] == REGISTER_TOKEN);
+            char game = match[1];
             string username = "";
             string password = "";
 
             int i = 2;
-            while (i < message.Length && message[i] != ',')
+            while (i < match.Length && match[i] != ',')
             {
-                username += message[i];
+                username += match[i];
                 ++i;
             }
-            if (i == message.Length)
+            if (i == match.Length)
             {
-                Console.WriteLine("Improperly formatted login message, didn't separate username and password with a comma:");
-                Console.WriteLine(message);
+                Debug("Improperly formatted login message, didn't separate username and password with a comma:\n" + message);
+                return;
             }
-            if (IsUsernameValid(username))
+            if (!IsUsernameValid(username))
             {
-                Console.WriteLine("Invalid username format:");
-                Console.WriteLine(username);
+                Debug("Invalid username format: " + username);
+                return;
             }
             
             ++i;
-            while (i < message.Length)
+            while (i < match.Length)
             {
-                password += message[i];
+                password += match[i];
                 ++i;
             }
 
@@ -159,6 +173,14 @@ namespace PGLoginServer
         {
             controller.IsRunning = false;
             controller = null;
+        }
+
+        private void Debug(string s)
+        {
+            if (DEBUG)
+            {
+                Console.WriteLine("LOGIN: " + s);
+            }
         }
     }
 }
