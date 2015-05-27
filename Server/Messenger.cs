@@ -8,7 +8,7 @@ using System.Net;
 using System.Net.Sockets;
 using Newtonsoft.Json;
 
-namespace PGLoginServer
+namespace Server
 {
     class Messenger
     {

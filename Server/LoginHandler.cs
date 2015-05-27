@@ -9,7 +9,7 @@ using System.Net;
 using System.Net.Sockets;
 using Newtonsoft.Json;
 
-namespace PGLoginServer
+namespace Server
 {
     class LoginHandler
     {
@@ -46,8 +46,8 @@ namespace PGLoginServer
             // - Second character is game token
             // - From then up to the first comma is the username
             // - From then up to the end is the password
-            string loginRegex = "[" + LOGIN_TOKEN + REGISTER_TOKEN + "]" + 
-                                "[" + Messenger.GAME_TOKEN + "]" + 
+            string loginRegex = "[" + LOGIN_TOKEN + REGISTER_TOKEN + "]" +
+                                "[" + Messenger.GAME_TOKEN + TurnBasedRPG.GAME_TOKEN + "]" + 
                                 ".{4,16},.{4,16}$";
 
             string match = Regex.Match(message, loginRegex).Value;

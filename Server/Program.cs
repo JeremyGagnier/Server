@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using System.Net;
 using System.Net.Sockets;
 
-namespace PGLoginServer
+namespace Server
 {
     class Program
     {
@@ -73,6 +73,14 @@ namespace PGLoginServer
             if (game == Messenger.GAME_TOKEN)
             {
                 Messenger tmp = new Messenger(socket, username);
+                tmp.onCloseConnection += (e) =>
+                {
+                    usersOnline -= 1;
+                };
+            }
+            else if (game == TurnBasedRPG.GAME_TOKEN)
+            {
+                TurnBasedRPG tmp = new TurnBasedRPG(socket, username);
                 tmp.onCloseConnection += (e) =>
                 {
                     usersOnline -= 1;
