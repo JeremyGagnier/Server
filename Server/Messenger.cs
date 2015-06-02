@@ -10,7 +10,7 @@ using Newtonsoft.Json;
 
 namespace Server
 {
-    class Messenger
+    public class Messenger
     {
         public const bool DEBUG = true;
 

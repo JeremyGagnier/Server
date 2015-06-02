@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 
 namespace Server
 {
-    class LoginHandler
+    public class LoginHandler
     {
         public const bool DEBUG = true;
 
