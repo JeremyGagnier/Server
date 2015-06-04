@@ -24,7 +24,7 @@ namespace Server
         public bool hasStarted = false;
         public List<string> players = new List<string>();
         public Action<string> sendMessage = null;
-        public Dictionary<string, object> gameData = new Dictionary<string, object>();
+        public Dictionary<string, string> gameData = new Dictionary<string, string>();
     }
 
     public class TurnBasedRPG
@@ -34,25 +34,40 @@ namespace Server
         public const char GAME_TOKEN = 'r';
         public const int PLAYER_LIMIT = 4;
 
+        /*
+         * The following is protocol so that messages can be interpreted by both ends.
+         */
+
+        // This token is used to signify a new message.
+        public const char NEW_MESSAGE = (char)0;
+
+        // This token is used to separate important pieces of data
+        public const char SEPARATOR = (char)1;
+
         // These tokens are used for the creation and management of new games.
-        public const char NEW_LOBBY = 'n';
-        public const char JOIN_LOBBY = 'j';
-        public const char START_GAME = 's';
-        public const char KICK_PLAYER = 'k';
-        public const char LEAVE_LOBBY = 'l';
+        public const char NEW_LOBBY = (char)2;
+        public const char JOIN_LOBBY = (char)3;
+        public const char START_GAME = (char)4;
+        public const char KICK_PLAYER = (char)5;
+        public const char LEAVE_LOBBY = (char)6;
+        public const char REMOVE_LOBBY = (char)7;
+        public const char LOBBY_INFO = (char)8;
+        public const char HOST_PROMOTE = (char)9;
 
         // This token is used when sending important game information such as
         // which ability you've chosen to use next or what item you bought.
-        public const char GAME_INFO = 'g';
+        public const char GAME_INFO = (char)10;
         
         // Storing and retrieving relevant game information.
         // If you ask for information that doesn't yet exist you will be queued up to
         // get the information once it's created.
-        public const char GAME_DATA_GET = 'd';
-        public const char GAME_DATA_SET = 'c';
+        public const char GAME_DATA_GET = (char)11;
+        public const char GAME_DATA_SET = (char)12;
         
         // Indexed by unique game ID
         public static Dictionary<string, Game> games = new Dictionary<string, Game>();
+        public static Dictionary<string, Action<string>> players = new Dictionary<string, Action<string>>();
+        public static Action<string> waitingRoom = null;
 
         private SocketHandler.Controller controller = null;
         private Socket sock = null;
@@ -61,6 +76,7 @@ namespace Server
         private Dictionary<string, object> userData = null;
         public Action<Exception> onCloseConnection = null;
 
+
         public TurnBasedRPG(Socket socket, string username)
         {
             sock = socket;
@@ -68,6 +84,9 @@ namespace Server
             controller = new SocketHandler.Controller(socket);
             controller.onReceiveData += ParseMessage;
             controller.onCloseConnection += OnCloseConnection;
+            waitingRoom += SendMessage;
+            players.Add(user, SendMessage);
+            LobbyInfo();
 
             try
             {
@@ -139,9 +158,11 @@ namespace Server
                 // TODO: Send error message
                 return;
             }
-            // TODO: tell players looking at open lobbies that a new one was made
-            games[message] = new Game();
-            games[message].players.Add(user);
+            waitingRoom(NEW_LOBBY + message);   // Confirmation when you receive your own new lobby message
+            waitingRoom -= SendMessage;
+            game = message;
+            games[game] = new Game();
+            games[game].players.Add(user);
         }
 
         private void ParseJoinLobby(string message)
@@ -164,10 +185,11 @@ namespace Server
                 // TODO: Send error message
                 return;
             }
-            // TODO: tell other players that this player has joined
             game = message;
-            games[message].players.Add(user);
-            games[message].sendMessage += SendMessage;
+            games[game].players.Add(user);
+            games[game].sendMessage += SendMessage;
+            games[game].sendMessage(JOIN_LOBBY + user); // Confirmation when you receive your own join message
+            waitingRoom -= SendMessage;
         }
 
         private void ParseStartGame(string message)
@@ -190,9 +212,8 @@ namespace Server
                 // TODO: Send error message
                 return;
             }
-            // TODO: tell players the game has started
             games[game].hasStarted = true;
-            games[game].sendMessage(START_GAME + "");
+            games[game].sendMessage(START_GAME + "");   // Confirmation when you receive your own start message
         }
 
         private void ParseKickPlayer(string message)
@@ -230,7 +251,7 @@ namespace Server
                 // TODO: Send error message
                 return;
             }
-            // TODO: tell other players that this player has been removed
+            games[game].sendMessage(KICK_PLAYER + message); // Confirmation when you receive your own kick player message.
             games[game].players.RemoveAt(index);
         }
 
@@ -242,15 +263,26 @@ namespace Server
                 // TODO: Send error message
                 return;
             }
-            // TODO: Do special things if the user was the host
-            // TODO: tell other players that this player left
+
+            // Promote a new host if the player that left was the previous host.
+            if (games[game].players[0] == user && games[game].players.Count > 1)
+            {
+                players[games[game].players[1]](HOST_PROMOTE + "");
+            }
+
             games[game].players.Remove(user);
             if (games[game].players.Count == 0)
             {
-                // TODO: tell players looking at open lobbies that this game is dead
+                waitingRoom(REMOVE_LOBBY + game);    // Tell those waiting in the lobby that this game is dead
                 games.Remove(game);
             }
+            else
+            {
+                games[game].sendMessage(LEAVE_LOBBY + user);
+            }
             game = null;
+            waitingRoom += SendMessage;
+            LobbyInfo();
         }
 
         private void ParseGameInfo(string message)
@@ -263,6 +295,57 @@ namespace Server
             }
             // Relay the info
             games[game].sendMessage(message);
+        }
+
+        private void ParseDataGet(string message)
+        {
+            if (game == null)
+            {
+                Debug("Player " + user + " tried to get game info when they weren't in a game");
+                // TODO: Send error message
+                return;
+            }
+            if (games[game].gameData.ContainsKey(message))
+            {
+                // TODO: Send the data
+            }
+            else
+            {
+                // TODO: Add request to a queue to wait for that piece of data
+            }
+        }
+
+        private void ParseDataSet(string message)
+        {
+            if (game == null)
+            {
+                Debug("Player " + user + " tried to get game info when they weren't in a game");
+                // TODO: Send error message
+                return;
+            }
+            string key = "";
+            string data = "";
+            for (int i = 0; i < message.Length; ++i)
+            {
+                if (message[i] != SEPARATOR)
+                {
+                    key += message[i];
+                }
+                else
+                {
+                    data = message.Substring(i + 1);
+                    break;
+                }
+            }
+            games[game].gameData[key] = data;
+        }
+
+        private void LobbyInfo()
+        {
+            foreach (string gameName in games.Keys)
+            {
+                SendMessage(LOBBY_INFO + gameName + SEPARATOR + games[gameName].players.Count.ToString());
+            }
         }
 
         private void SendMessage(string message)
