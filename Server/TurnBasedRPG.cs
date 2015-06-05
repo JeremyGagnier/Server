@@ -25,7 +25,10 @@ namespace Server
         public List<string> players = new List<string>();
         public Action<string> sendMessage = null;
         public Dictionary<string, string> gameData = new Dictionary<string, string>();
+        public Dictionary<string, Action<string>> dataQueue = new Dictionary<string, Action<string>>();
     }
+
+
 
     public class TurnBasedRPG
     {
@@ -39,35 +42,50 @@ namespace Server
          */
 
         // This token is used to signify a new message.
-        public const char NEW_MESSAGE = (char)0;
+        public const char NEW_MESSAGE =     (char)0;
 
         // This token is used to separate important pieces of data
-        public const char SEPARATOR = (char)1;
+        public const char SEPARATOR =       (char)1;
 
         // These tokens are used for the creation and management of new games.
-        public const char NEW_LOBBY = (char)2;
-        public const char JOIN_LOBBY = (char)3;
-        public const char START_GAME = (char)4;
-        public const char KICK_PLAYER = (char)5;
-        public const char LEAVE_LOBBY = (char)6;
-        public const char REMOVE_LOBBY = (char)7;
-        public const char LOBBY_INFO = (char)8;
-        public const char HOST_PROMOTE = (char)9;
+        public const char NEW_LOBBY =       (char)2;
+        public const char JOIN_LOBBY =      (char)3;
+        public const char START_GAME =      (char)4;
+        public const char KICK_PLAYER =     (char)5;
+        public const char LEAVE_LOBBY =     (char)6;
+        public const char REMOVE_LOBBY =    (char)7;
+        public const char LOBBY_INFO =      (char)8;
+        public const char HOST_PROMOTE =    (char)9;
 
         // This token is used when sending important game information such as
         // which ability you've chosen to use next or what item you bought.
-        public const char GAME_INFO = (char)10;
+        public const char GAME_INFO =       (char)10;
         
         // Storing and retrieving relevant game information.
         // If you ask for information that doesn't yet exist you will be queued up to
         // get the information once it's created.
-        public const char GAME_DATA_GET = (char)11;
-        public const char GAME_DATA_SET = (char)12;
+        public const char GAME_DATA_GET =   (char)11;
+        public const char GAME_DATA_SET =   (char)12;
+
+        /*
+         * The following are tokens for error messages.
+         */
+        public const char ERROR_NOT_IN_GAME =       (char)13;
+        public const char ERROR_ALREADY_IN_GAME =   (char)14;
+        public const char ERROR_GAME_EXISTS =       (char)15;
+        public const char ERROR_GAME_DOESNT_EXIST = (char)16;
+        public const char ERROR_GAME_FULL =         (char)17;
+        public const char ERROR_NOT_HOST =          (char)18;
+        public const char ERROR_GAME_STARTED =      (char)19;
+        public const char ERROR_SELF_KICK =         (char)20;
+        public const char ERROR_PLAYER_NOT_FOUND =  (char)21;
         
+
+
         // Indexed by unique game ID
-        public static Dictionary<string, Game> games = new Dictionary<string, Game>();
-        public static Dictionary<string, Action<string>> players = new Dictionary<string, Action<string>>();
-        public static Action<string> waitingRoom = null;
+        private static Dictionary<string, Game> games = new Dictionary<string, Game>();
+        private static Dictionary<string, Action<string>> players = new Dictionary<string, Action<string>>();
+        private static Action<string> waitingRoom = null;
 
         private SocketHandler.Controller controller = null;
         private Socket sock = null;
@@ -149,13 +167,13 @@ namespace Server
             if (game != null)
             {
                 Debug("Player " + user + " tried to create a new game before leaving the one they were in");
-                // TODO: Send error message
+                SendMessage(ERROR_ALREADY_IN_GAME + "");
                 return;
             }
             if (games.ContainsKey(message))
             {
                 Debug("Player " + user + " tried to create a new game with the same name as an existing game.");
-                // TODO: Send error message
+                SendMessage(ERROR_GAME_EXISTS + "");
                 return;
             }
             waitingRoom(NEW_LOBBY + message);   // Confirmation when you receive your own new lobby message
@@ -170,19 +188,19 @@ namespace Server
             if (game != null)
             {
                 Debug("Player " + user + " tried to join a game before leaving the one they were in");
-                // TODO: Send error message
+                SendMessage(ERROR_ALREADY_IN_GAME + "");
                 return;
             }
             if (!games.ContainsKey(message))
             {
                 Debug("Player " + user + " tried to join a game that doesn't exist");
-                // TODO: Send error message
+                SendMessage(ERROR_GAME_DOESNT_EXIST + "");
                 return;
             }
             if (games[message].players.Count >= PLAYER_LIMIT)
             {
                 Debug("Player " + user + " tried to join a game that is full");
-                // TODO: Send error message
+                SendMessage(ERROR_GAME_FULL + "");
                 return;
             }
             game = message;
@@ -197,19 +215,19 @@ namespace Server
             if (game == null)
             {
                 Debug("Player " + user + " tried to start a game that they weren't even in");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_IN_GAME + "");
                 return;
             }
             if (games[game].players[0] != user)
             {
                 Debug("Player " + user + " tried to start a game that they weren't the host of");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_HOST + "");
                 return;
             }
             if (games[game].hasStarted == true)
             {
                 Debug("Player " + user + " tried to start a game that has already begun");
-                // TODO: Send error message
+                SendMessage(ERROR_GAME_STARTED + "");
                 return;
             }
             games[game].hasStarted = true;
@@ -221,13 +239,13 @@ namespace Server
             if (game == null)
             {
                 Debug("Player " + user + " tried to kick a player when they weren't in a game");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_IN_GAME + "");
                 return;
             }
             if (games[game].players[0] != user)
             {
                 Debug("Player " + user + " tried to kick a player when they weren't the host");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_HOST + "");
                 return;
             }
             int index = 0;
@@ -242,13 +260,13 @@ namespace Server
             if (message == user)
             {
                 Debug("Player " + user + " tried to kick themselves from the game");
-                // TODO: Send error message
+                SendMessage(ERROR_SELF_KICK + "");
                 return;
             }
             else if (index == 0)
             {
                 Debug("Player " + user + " tried to kick a player that wasn't in the game");
-                // TODO: Send error message
+                SendMessage(ERROR_PLAYER_NOT_FOUND + "");
                 return;
             }
             games[game].sendMessage(KICK_PLAYER + message); // Confirmation when you receive your own kick player message.
@@ -260,7 +278,7 @@ namespace Server
             if (game == null)
             {
                 Debug("Player " + user + " tried to leave a game when they weren't in one");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_IN_GAME + "");
                 return;
             }
 
@@ -290,7 +308,7 @@ namespace Server
             if (game == null)
             {
                 Debug("Player " + user + " tried to send game info when they weren't in a game");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_IN_GAME + "");
                 return;
             }
             // Relay the info
@@ -302,16 +320,24 @@ namespace Server
             if (game == null)
             {
                 Debug("Player " + user + " tried to get game info when they weren't in a game");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_IN_GAME + "");
                 return;
             }
             if (games[game].gameData.ContainsKey(message))
             {
-                // TODO: Send the data
+                SendMessage(GAME_DATA_GET + games[game].gameData[message]);
             }
             else
             {
-                // TODO: Add request to a queue to wait for that piece of data
+                // If the data doesn't exist yet put the player on a queue to wait for it to exist.
+                if (games[game].dataQueue.ContainsKey(message))
+                {
+                    games[game].dataQueue[message] += SendMessage;
+                }
+                else
+                {
+                    games[game].dataQueue.Add(message, SendMessage);
+                }
             }
         }
 
@@ -320,7 +346,7 @@ namespace Server
             if (game == null)
             {
                 Debug("Player " + user + " tried to get game info when they weren't in a game");
-                // TODO: Send error message
+                SendMessage(ERROR_NOT_IN_GAME + "");
                 return;
             }
             string key = "";
@@ -338,6 +364,10 @@ namespace Server
                 }
             }
             games[game].gameData[key] = data;
+            if (games[game].dataQueue.ContainsKey(key))
+            {
+                games[game].dataQueue[key](GAME_DATA_GET + data);
+            }
         }
 
         private void LobbyInfo()
